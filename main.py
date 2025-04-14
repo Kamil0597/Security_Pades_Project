@@ -1,6 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QLabel
-
+from PyQt6.QtWidgets import QApplication
 from cryptography_functions import generate_private_key_RSA, generate_public_key_from_private_RSA
 from GUI import BasicApp
 

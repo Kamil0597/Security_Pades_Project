@@ -1,72 +1,75 @@
 import os
-import sys
-import threading
-import time
-from glob import glob
-from subprocess import check_output
-
-import psutil
 import wmi as wmi
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QLabel, QLineEdit, QComboBox
+from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLineEdit, QComboBox, QHBoxLayout, QGroupBox, QFormLayout
 from cryptography.hazmat.primitives import serialization
 
-from PIN_window import PIN_window
 from cryptography_functions import generate_RSA_keys_and_hash_private
-from other_functions import convert_private_key_to_string, convert_public_key_to_string
-from PyPDF2 import PdfReader, PdfWriter
 
 folder = "/private_key/"
 private_key_filename = "encrypted_private_key.pem"
 
 public_key_path = "C:/public_key/"
 public_key_file_name = "public_key.pem"
+
 class BasicApp(QWidget):
     def __init__(self):
         super().__init__()
-
         self.selected_value = None
         self.encrypted_private_key = None
         self.public_key = None
         self.iv = None
+        self.PIN = None
+
+        self.previous_devices = []
         self.initUI()
 
     def initUI(self):
+        self.setWindowTitle("Generator klucza RSA")
+        self.setGeometry(300, 300, 500, 300)
 
-        devices = self.get_usb_devices()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
-        self.setWindowTitle("Podstawowa aplikacja")
-        self.setGeometry(300, 300, 600, 400)
-
-        self.layout = QVBoxLayout()
-
-        # Etykiety informacyjna
-        self.label = QLabel("Wybierz plik:", self)
-        self.layout.addWidget(self.label)
+        usb_group = QGroupBox("Wybór pendrive'a")
+        usb_layout = QFormLayout()
 
         self.combo = QComboBox()
-        for device in devices:
-            self.combo.addItem(device)
-        self.layout.addWidget(self.combo)
+        usb_layout.addRow("Wykryte urządzenia USB:", self.combo)
+        usb_group.setLayout(usb_layout)
 
+        main_layout.addWidget(usb_group)
 
-        # Przycisk
-        self.btn_action = QPushButton("Dodaj klucz", self)
-        self.btn_action.setFixedSize(120, 60)
-        self.btn_action.clicked.connect(self.add_key)
-        self.layout.addWidget(self.btn_action)
+        pin_group = QGroupBox("Kod PIN użytkownika")
+        pin_layout = QFormLayout()
 
-        self.test_btn = QPushButton("save_key_on_pendrive", self)
-        self.test_btn.setFixedSize(120,60)
-        self.test_btn.clicked.connect(self.save_key_on_pendrive)
-        self.layout.addWidget(self.test_btn)
+        self.pin_input = QLineEdit()
+        self.pin_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pin_input.setPlaceholderText("Wpisz PIN")
+        pin_layout.addRow("PIN:", self.pin_input)
+        pin_group.setLayout(pin_layout)
 
-        self.setLayout(self.layout)
+        main_layout.addWidget(pin_group)
 
-        self.previous_devices = []
-        self.update_usb_devices()  # Wczytaj pierwszy raz
+        button_layout = QHBoxLayout()
 
-        # Timer do sprawdzania zmian co 2000 ms (2 sekundy)
+        self.btn_generate = QPushButton("Generuj klucz z Pinu")
+        self.btn_generate.setFixedHeight(50)
+        self.btn_generate.clicked.connect(self.add_key)
+
+        self.btn_save = QPushButton("Zapisz na pendrive")
+        self.btn_save.setFixedHeight(50)
+        self.btn_save.clicked.connect(self.save_key_on_pendrive)
+
+        button_layout.addWidget(self.btn_generate)
+        button_layout.addWidget(self.btn_save)
+
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
+
+        self.update_usb_devices()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_for_changes)
         self.timer.start(2000)
@@ -97,12 +100,9 @@ class BasicApp(QWidget):
             print("saved on disk")
 
     def add_key(self):
-        pin_window = PIN_window(self)
-        if pin_window.exec():  # Otwieranie okna i czekanie na wynik
-            pin_code = pin_window.get_pin()
-            print(f"Wprowadzony PIN: {pin_code}")  # Możesz zapisać go gdzieś dalej
-            self.encrypted_private_key, self.public_key, self.iv = generate_RSA_keys_and_hash_private(pin_code)
-
+        pin_code = self.pin_input.text()
+        print(pin_code)
+        self.encrypted_private_key, self.public_key, self.iv = generate_RSA_keys_and_hash_private(pin_code)
 
 
     def get_usb_devices(self):
